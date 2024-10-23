@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">LR-3</string>
+    <string name="the_first_name_of_student">The first name of student</string>
+    <string name="the_last_name_of_student">The last name of student</string>
+    <string name="student_group">Student group</string>
+    <string name="add_new_student">Add new student</string>
+</resources>
