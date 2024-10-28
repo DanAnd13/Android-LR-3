@@ -1,81 +1,126 @@
 package com.example.lr_3
 
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.DividerItemDecoration
+import androidx.lifecycle.Observer
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import kotlinx.coroutines.launch
+import kotlin.random.Random
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var recyclerView: RecyclerView
     private lateinit var adapter: MyAdapter
-    private lateinit var studentViewModel: StudentViewModel
+    private lateinit var studentDao: StudentDao
+    private val studentList = mutableListOf<Student>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Налаштування padding для edge-to-edge
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
-        }
+        val db = AppDatabase.getDatabase(this)
+        studentDao = db.studentDao()
 
-        // Ініціалізація RecyclerView
-        recyclerView = findViewById(R.id.recyclerView)
-        val addButton = findViewById<Button>(R.id.new_student)
+        val recyclerView: RecyclerView = findViewById(R.id.recyclerView)
+        val addButton: Button = findViewById(R.id.new_student)
+        val deleteButton: Button = findViewById(R.id.delete_student)
+
         recyclerView.layoutManager = LinearLayoutManager(this)
-
-        // Додавання розділювачів між елементами
-        val dividerItemDecoration = DividerItemDecoration(
-            recyclerView.context,
-            (recyclerView.layoutManager as LinearLayoutManager).orientation
-        )
-        recyclerView.addItemDecoration(dividerItemDecoration)
-
-        // Ініціалізація ViewModel
-        studentViewModel = ViewModelProvider(this).get(StudentViewModel::class.java)
-
-        // Створення адаптера та підключення його до RecyclerView
-        adapter = MyAdapter(mutableListOf())
+        adapter = MyAdapter(studentList, mutableMapOf())
         recyclerView.adapter = adapter
 
-        // Спостереження за змінами в студентському списку
-        studentViewModel.studentsList.observe(this) { updatedList ->
-            adapter.updateData(updatedList)
-        }
+        studentDao.getAllStudents().observe(this, Observer { students ->
+            studentList.clear()
+            studentList.addAll(students)
+            adapter.updateData(studentList)
+            loadGradesForStudents()
+        })
 
-        // Відновлення лічильника студентів при обертанні екрану
-        if (studentViewModel.studentsList.value.isNullOrEmpty()) {
-            populateInitialData()  // Додавання початкових даних тільки при першому запуску
-        } else {
-            // Відновлюємо лічильник після перезавантаження
-            studentViewModel.restoreCounter()
-        }
-
-        // Обробка натискання кнопки для додавання нового студента
         addButton.setOnClickListener {
             addNewStudent()
         }
-    }
 
-    // Заповнення початковими даними через ViewModel
-    private fun populateInitialData() {
-        for (i in 1..5) {
-            studentViewModel.addStudent(Student("FirstName$i", "LastName$i", "Group$i"))
+        deleteButton.setOnClickListener {
+            deleteStudentWithLowestAverage()
         }
-        studentViewModel.studentCounter = 6 // Починаємо лічильник з 6, оскільки 5 студентів уже додано
     }
 
-    // Метод для додавання нового студента через ViewModel
+    private fun deleteStudentWithLowestAverage() {
+        lifecycleScope.launch {
+            val studentWithLowestAverage = studentDao.getStudentWithLowestAverage()
+
+            if (studentWithLowestAverage != null) {
+                studentDao.deleteStudent(studentWithLowestAverage.student)
+
+                loadStudentsFromDatabase()
+            } else {
+                Log.d("StudentList", "No students found for deletion")
+            }
+        }
+    }
+
     private fun addNewStudent() {
-        val newStudent = Student("FirstName${studentViewModel.studentCounter}", "LastName${studentViewModel.studentCounter}", "Group${studentViewModel.studentCounter}")
-        studentViewModel.addStudent(newStudent)
-        studentViewModel.incrementCounter()
+        lifecycleScope.launch {
+            val newStudent = Student(0, "FirstName", "LastName", "Group")
+
+            val studentId = studentDao.insertStudent(newStudent).toInt()
+
+            val updatedStudent = newStudent.copy(
+                id = studentId,
+                firstName = "${newStudent.firstName} $studentId",
+                lastName = "${newStudent.lastName} $studentId"
+            )
+            studentDao.updateStudent(updatedStudent)
+
+            generateGradesForStudent(studentId)
+
+            loadStudentsFromDatabase()
+        }
+    }
+
+    private fun generateGradesForStudent(studentId: Int) {
+        val subjects = listOf("Math", "English")
+        lifecycleScope.launch {
+            val studentGrades = mutableListOf<Grade>()
+            subjects.forEach { subject ->
+                val gradeValue = Random.nextInt(60, 101)
+                val grade = Grade(0, studentId, subject, gradeValue)
+                try {
+                    studentDao.insertGrade(grade)
+                    studentGrades.add(grade)
+                } catch (e: Exception) {
+                    Log.e("Database Error", "Failed to insert grade: $e")
+                }
+            }
+            adapter.gradesMap[studentId] = studentGrades
+            adapter.notifyDataSetChanged()
+        }
+    }
+
+    private fun loadStudentsFromDatabase() {
+        lifecycleScope.launch {
+            val studentsFromDb = studentDao.getAllStudents().value ?: emptyList()
+            studentList.clear()
+            studentList.addAll(studentsFromDb)
+
+            studentsFromDb.forEach { student ->
+                val grades = studentDao.getGradesForStudent(student.id).value ?: emptyList()
+                adapter.gradesMap[student.id] = grades
+            }
+
+            adapter.updateData(studentList)
+        }
+    }
+
+    private fun loadGradesForStudents() {
+        studentList.forEach { student ->
+            lifecycleScope.launch {
+                studentDao.getGradesForStudent(student.id).observe(this@MainActivity, Observer { grades ->
+                    adapter.updateGrades(student.id, grades)
+                })
+            }
+        }
     }
 }

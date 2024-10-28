@@ -1,34 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
+    android:divider="?android:dividerVertical"
     android:orientation="horizontal"
     android:padding="10dp"
-    android:showDividers="middle"
-    android:divider="?android:dividerVertical">
+    android:showDividers="middle">
 
     <TextView
         android:id="@+id/first_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:paddingHorizontal="15dp"
         android:text="@string/the_first_name_of_student"
-        android:textSize="20sp"
-        android:paddingHorizontal="15dp"/>
+        android:textSize="15sp" />
 
     <TextView
         android:id="@+id/last_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:paddingHorizontal="15dp"
         android:text="@string/the_last_name_of_student"
-        android:textSize="20sp"
-        android:paddingHorizontal="15dp"/>
+        android:textSize="15sp" />
 
     <TextView
         android:id="@+id/student_group"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:paddingHorizontal="15dp"
         android:text="@string/student_group"
-        android:textSize="20sp"
-        android:paddingHorizontal="15dp"/>
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/student_grade"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="15dp"
+        android:text="@string/student_grade"
+        android:textSize="15sp" />
 </LinearLayout>
