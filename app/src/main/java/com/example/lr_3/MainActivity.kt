@@ -1,20 +1,28 @@
 package com.example.lr_3
 
+import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.widget.Button
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.gson.GsonBuilder
 import kotlinx.coroutines.launch
-import kotlin.random.Random
+import retrofit2.Call
+import retrofit2.Response
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : AppCompatActivity() {
     private lateinit var adapter: MyAdapter
     private lateinit var studentDao: StudentDao
+    private lateinit var studentApiService: StudentApiService
     private val studentList = mutableListOf<Student>()
+    private var currentStudentId: Int = 1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,95 +30,89 @@ class MainActivity : AppCompatActivity() {
 
         val db = AppDatabase.getDatabase(this)
         studentDao = db.studentDao()
-
+        adapter = MyAdapter(studentList, mutableMapOf(), ::deleteStudent)
         val recyclerView: RecyclerView = findViewById(R.id.recyclerView)
         val addButton: Button = findViewById(R.id.new_student)
-        val deleteButton: Button = findViewById(R.id.delete_student)
+
+        val gson = GsonBuilder()
+            .setLenient()
+            .create()
+
+        val retrofit = Retrofit.Builder()
+            .baseUrl("https://4befe232-b96a-410d-bd27-d434169f7c3d.mock.pstmn.io/")
+            .addConverterFactory(GsonConverterFactory.create(gson))
+            .build()
+
+        studentApiService = retrofit.create(StudentApiService::class.java)
 
         recyclerView.layoutManager = LinearLayoutManager(this)
-        adapter = MyAdapter(studentList, mutableMapOf())
         recyclerView.adapter = adapter
 
-        studentDao.getAllStudents().observe(this, Observer { students ->
-            studentList.clear()
-            studentList.addAll(students)
-            adapter.updateData(studentList)
-            loadGradesForStudents()
-        })
+            loadCurrentStudentId()
+        loadStudentsFromDatabase()
 
         addButton.setOnClickListener {
-            addNewStudent()
-        }
-
-        deleteButton.setOnClickListener {
-            deleteStudentWithLowestAverage()
+            fetchStudentById(currentStudentId)
         }
     }
 
-    private fun deleteStudentWithLowestAverage() {
-        lifecycleScope.launch {
-            val studentWithLowestAverage = studentDao.getStudentWithLowestAverage()
+    private fun fetchStudentById(studentId: Int) {
+        studentApiService.getStudent(studentId).enqueue(object : retrofit2.Callback<StudentResponse> {
+            override fun onResponse(call: Call<StudentResponse>, response: Response<StudentResponse>) {
+                if (response.isSuccessful) {
+                    response.body()?.let { studentResponse ->
+                        if (studentResponse.student.id == studentId) {
+                            Log.d("Student", "Student: ${studentResponse.student.firstName} ${studentResponse.student.lastName}")
 
-            if (studentWithLowestAverage != null) {
-                studentDao.deleteStudent(studentWithLowestAverage.student)
+                            lifecycleScope.launch {
+                                studentDao.insertStudent(studentResponse.student)
 
-                loadStudentsFromDatabase()
-            } else {
-                Log.d("StudentList", "No students found for deletion")
-            }
-        }
-    }
+                                studentResponse.grades.forEach { (subject, grade) ->
+                                    val gradeEntity = Grade(studentId = studentResponse.student.id, subject = subject, grade = grade)
+                                    studentDao.insertGrade(gradeEntity)
+                                }
 
-    private fun addNewStudent() {
-        lifecycleScope.launch {
-            val newStudent = Student(0, "FirstName", "LastName", "Group")
-
-            val studentId = studentDao.insertStudent(newStudent).toInt()
-
-            val updatedStudent = newStudent.copy(
-                id = studentId,
-                firstName = "${newStudent.firstName} $studentId",
-                lastName = "${newStudent.lastName} $studentId"
-            )
-            studentDao.updateStudent(updatedStudent)
-
-            generateGradesForStudent(studentId)
-
-            loadStudentsFromDatabase()
-        }
-    }
-
-    private fun generateGradesForStudent(studentId: Int) {
-        val subjects = listOf("Math", "English")
-        lifecycleScope.launch {
-            val studentGrades = mutableListOf<Grade>()
-            subjects.forEach { subject ->
-                val gradeValue = Random.nextInt(60, 101)
-                val grade = Grade(0, studentId, subject, gradeValue)
-                try {
-                    studentDao.insertGrade(grade)
-                    studentGrades.add(grade)
-                } catch (e: Exception) {
-                    Log.e("Database Error", "Failed to insert grade: $e")
+                                currentStudentId++
+                                saveCurrentStudentId()
+                            }
+                        } else {
+                            Log.e("API Error", "ID mismatch: Expected $studentId, got ${studentResponse.student.id}")
+                            Toast.makeText(this@MainActivity, "Student with ID $studentId not found.", Toast.LENGTH_SHORT).show()
+                            currentStudentId++
+                            saveCurrentStudentId()
+                        }
+                    }
+                } else {
+                    Log.e("API Error", "Error fetching student data: ${response.message()}")
+                    Toast.makeText(this@MainActivity, "Student with ID $studentId not found.", Toast.LENGTH_SHORT).show()
+                    currentStudentId++
+                    saveCurrentStudentId()
                 }
             }
-            adapter.gradesMap[studentId] = studentGrades
-            adapter.notifyDataSetChanged()
+
+            override fun onFailure(call: Call<StudentResponse>, t: Throwable) {
+                Log.e("API Error", "Failed to fetch student: ${t.message}")
+                Toast.makeText(this@MainActivity, "Failed to fetch student: ${t.message}", Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
+
+    private fun deleteStudent(student: Student) {
+        lifecycleScope.launch {
+            studentDao.deleteStudent(student)
+            Log.d("StudentList", "Deleted student: ${student.firstName} ${student.lastName}")
         }
     }
 
     private fun loadStudentsFromDatabase() {
         lifecycleScope.launch {
-            val studentsFromDb = studentDao.getAllStudents().value ?: emptyList()
-            studentList.clear()
-            studentList.addAll(studentsFromDb)
+            studentDao.getAllStudents().observe(this@MainActivity, Observer { students ->
+                studentList.clear()
+                studentList.addAll(students)
+                adapter.updateData(studentList)
 
-            studentsFromDb.forEach { student ->
-                val grades = studentDao.getGradesForStudent(student.id).value ?: emptyList()
-                adapter.gradesMap[student.id] = grades
-            }
-
-            adapter.updateData(studentList)
+                loadGradesForStudents()
+            })
         }
     }
 
@@ -118,9 +120,24 @@ class MainActivity : AppCompatActivity() {
         studentList.forEach { student ->
             lifecycleScope.launch {
                 studentDao.getGradesForStudent(student.id).observe(this@MainActivity, Observer { grades ->
-                    adapter.updateGrades(student.id, grades)
+                    grades?.let {
+                        adapter.updateGrades(student.id, it)
+                    } ?: Log.e("Database Error", "Grades for student ${student.firstName} not found")
                 })
             }
+        }
+    }
+
+    private fun loadCurrentStudentId() {
+        val sharedPref = getSharedPreferences("student_app_prefs", Context.MODE_PRIVATE)
+        currentStudentId = sharedPref.getInt("currentStudentId", 1)
+    }
+
+    private fun saveCurrentStudentId() {
+        val sharedPref = getSharedPreferences("student_app_prefs", Context.MODE_PRIVATE)
+        with(sharedPref.edit()) {
+            putInt("currentStudentId", currentStudentId)
+            apply()
         }
     }
 }

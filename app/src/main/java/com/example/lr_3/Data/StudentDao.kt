@@ -17,10 +17,6 @@ interface StudentDao {
     @Update
     suspend fun updateStudent(student: Student)
 
-    @Transaction
-    @Query("SELECT students.*, AVG(grades.grade) as averageGrade FROM students LEFT JOIN grades ON students.id = grades.studentId GROUP BY students.id ORDER BY averageGrade ASC LIMIT 1")
-    suspend fun getStudentWithLowestAverage(): StudentWithGrades?
-
     @Query("SELECT * FROM students")
     fun getAllStudents(): LiveData<List<Student>>
 

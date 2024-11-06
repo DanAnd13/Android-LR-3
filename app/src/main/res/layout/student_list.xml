@@ -11,31 +11,33 @@
         android:id="@+id/first_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="15dp"
-        android:text="@string/the_first_name_of_student"
-        android:textSize="15sp" />
+        android:paddingHorizontal="5dp"
+        android:text="@string/the_first_name_of_student" />
 
     <TextView
         android:id="@+id/last_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="15dp"
-        android:text="@string/the_last_name_of_student"
-        android:textSize="15sp" />
+        android:paddingHorizontal="5dp"
+        android:text="@string/the_last_name_of_student" />
 
     <TextView
         android:id="@+id/student_group"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="15dp"
-        android:text="@string/student_group"
-        android:textSize="15sp" />
+        android:paddingHorizontal="5dp"
+        android:text="@string/student_group" />
 
     <TextView
         android:id="@+id/student_grade"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="15dp"
-        android:text="@string/student_grade"
-        android:textSize="15sp" />
+        android:paddingHorizontal="5dp"
+        android:text="@string/student_grade" />
+    <Button
+        android:id="@+id/delete_student"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="5dp"
+        android:text="@string/delete" />
 </LinearLayout>

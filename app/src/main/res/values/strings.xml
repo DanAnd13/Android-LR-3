@@ -6,4 +6,5 @@
     <string name="add_new_student">Add new student</string>
     <string name="student_grade">grade</string>
     <string name="delete_student">Delete student</string>
+    <string name="delete">Delete</string>
 </resources>

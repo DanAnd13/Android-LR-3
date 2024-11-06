@@ -3,12 +3,14 @@ package com.example.lr_3
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class MyAdapter(
     private var students: List<Student>,
-    val gradesMap: MutableMap<Int, List<Grade>>
+    val gradesMap: MutableMap<Int, List<Grade>>,
+    private val onDeleteClick: (Student) -> Unit
 ) : RecyclerView.Adapter<MyAdapter.StudentViewHolder>() {
 
     inner class StudentViewHolder(view: View) : RecyclerView.ViewHolder(view) {
@@ -16,6 +18,7 @@ class MyAdapter(
         val lastNameText: TextView = view.findViewById(R.id.last_name)
         val groupText: TextView = view.findViewById(R.id.student_group)
         val gradesText: TextView = view.findViewById(R.id.student_grade)
+        val deleteButton: Button = view.findViewById(R.id.delete_student)
 
         fun bind(student: Student) {
             firstNameText.text = student.firstName
@@ -24,6 +27,10 @@ class MyAdapter(
 
             val studentGrades = gradesMap[student.id] ?: emptyList()
             gradesText.text = studentGrades.joinToString(", ") { "${it.subject}: ${it.grade}" }
+
+            deleteButton.setOnClickListener {
+                onDeleteClick(student)
+            }
         }
     }
 
